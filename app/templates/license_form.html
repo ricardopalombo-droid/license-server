@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Nova licença</h2>
+
+<section class="panel form-narrow">
+    <form method="post" action="/admin/licenses/new">
+        <label>Cliente</label>
+        <select name="customer_id" required>
+            {% for c in customers %}
+            <option value="{{ c.id }}">{{ c.name }}{% if c.company %} - {{ c.company }}{% endif %}</option>
+            {% endfor %}
+        </select>
+
+        <label>Produto</label>
+        <select name="product_id" required>
+            {% for p in products %}
+            <option value="{{ p.id }}">{{ p.name }} ({{ p.code }})</option>
+            {% endfor %}
+        </select>
+
+        <label>Plano</label>
+        <select name="plan_type" required>
+            <option value="monthly">Mensal</option>
+            <option value="annual">Anual</option>
+        </select>
+
+        <label>Máximo de sessões simultâneas</label>
+        <input type="number" name="max_concurrent_sessions" value="1" min="1" max="100" required>
+
+        <label>Observações</label>
+        <textarea name="notes" rows="4"></textarea>
+
+        <button type="submit">Criar licença</button>
+    </form>
+</section>
+{% endblock %}

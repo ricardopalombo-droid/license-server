@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Produtos</h2>
+
+<div class="grid-2">
+    <section class="panel">
+        {% if product_to_edit %}
+        <h3>Editar produto</h3>
+        <form method="post" action="/admin/products/{{ product_to_edit.id }}/update">
+            <label>Nome</label>
+            <input type="text" name="name" value="{{ product_to_edit.name }}" required>
+
+            <label>Código</label>
+            <input type="text" name="code" value="{{ product_to_edit.code }}" required>
+
+            <button type="submit">Salvar alterações</button>
+            <a class="button-link" href="/admin/products">Cancelar</a>
+        </form>
+        {% else %}
+        <h3>Novo produto</h3>
+        <form method="post" action="/admin/products">
+            <label>Nome</label>
+            <input type="text" name="name" required>
+
+            <label>Código</label>
+            <input type="text" name="code" required>
+
+            <button type="submit">Salvar produto</button>
+        </form>
+        {% endif %}
+    </section>
+
+    <section class="panel">
+        <h3>Lista</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>Código</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in products %}
+                <tr>
+                    <td>{{ p.id }}</td>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.code }}</td>
+                    <td>{{ "Ativo" if p.is_active else "Inativo" }}</td>
+                    <td>
+                        <div class="action-group">
+                            <form method="get" action="/admin/products">
+                                <input type="hidden" name="edit" value="{{ p.id }}">
+                                <button type="submit">Editar</button>
+                            </form>
+
+                            <form method="post" action="/admin/products/{{ p.id }}/toggle-active">
+                                <button type="submit">
+                                    {{ "Inativar" if p.is_active else "Ativar" }}
+                                </button>
+                            </form>
+
+                            <form method="post" action="/admin/products/{{ p.id }}/delete"
+                                  onsubmit="return confirm('Deseja realmente excluir este produto?');">
+                                <button type="submit">Excluir</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p style="margin-top:12px;">
+            Produtos com licenças vinculadas não serão excluídos.
+        </p>
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-row">
+    <h2>Licenças</h2>
+    <a class="button-link" href="/admin/licenses/new">Nova licença</a>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Cliente</th>
+            <th>Produto</th>
+            <th>Chave</th>
+            <th>Plano</th>
+            <th>Status</th>
+            <th>Vencimento</th>
+            <th>Sessões</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for lic in licenses %}
+        <tr>
+            <td>{{ lic.id }}</td>
+            <td>{{ lic.customer.company or lic.customer.name }}</td>
+            <td>{{ lic.product.name }}</td>
+            <td>{{ lic.license_key }}</td>
+            <td>{{ "Mensal" if lic.plan_type == "monthly" else "Anual" }}</td>
+            <td>
+                <span style="
+                    padding:2px 6px;
+                    border-radius:4px;
+                    background:
+                    {% if lic.status == 'active' %}#5cb85c
+                    {% elif lic.status == 'blocked' %}#d9534f
+                    {% else %}#777{% endif %};
+                    color:white;
+                ">
+                    {{ lic.status }}
+                </span>
+            </td>
+            <td>{{ lic.expires_at.strftime('%d/%m/%Y') if lic.expires_at else "" }}</td>
+            <td>{{ lic.max_concurrent_sessions }}</td>
+
+            <td>
+                <div class="action-group" style="display:flex; flex-wrap:wrap; gap:5px;">
+
+                    <form method="post" action="/admin/licenses/{{ lic.id }}/block">
+                        <button type="submit">Bloquear</button>
+                    </form>
+
+                    <form method="post" action="/admin/licenses/{{ lic.id }}/unblock">
+                        <button type="submit">Desbloquear</button>
+                    </form>
+
+                    <form method="post" action="/admin/licenses/{{ lic.id }}/renew-monthly">
+                        <button type="submit">+1 mês</button>
+                    </form>
+
+                    <form method="post" action="/admin/licenses/{{ lic.id }}/renew-annual">
+                        <button type="submit">+1 ano</button>
+                    </form>
+
+                    <form method="get" action="/admin/licenses/{{ lic.id }}/sessions">
+                        <button type="submit">Sessões</button>
+                    </form>
+
+                    <!-- BOTÃO EXCLUIR -->
+                    <form method="post" action="/admin/licenses/{{ lic.id }}/delete"
+                          onsubmit="return confirm('Deseja realmente excluir esta licença?');">
+                        <button type="submit" style="background:#c9302c; color:white;">
+                            Excluir
+                        </button>
+                    </form>
+
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Dashboard</h2>
+
+<div class="cards">
+    <div class="card"><strong>Clientes</strong><span>{{ total_customers }}</span></div>
+    <div class="card"><strong>Produtos</strong><span>{{ total_products }}</span></div>
+    <div class="card"><strong>Licenças</strong><span>{{ total_licenses }}</span></div>
+    <div class="card"><strong>Ativas</strong><span>{{ active_licenses }}</span></div>
+    <div class="card"><strong>Bloqueadas</strong><span>{{ blocked_licenses }}</span></div>
+    <div class="card"><strong>Sessões ativas</strong><span>{{ active_sessions }}</span></div>
+</div>
+
+<div class="dashboard-stack">
+    <section class="panel">
+        <h3>Últimas licenças</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Produto</th>
+                    <th>Chave</th>
+                    <th>Plano</th>
+                    <th>Status</th>
+                    <th>Vencimento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for lic in recent_licenses %}
+                <tr>
+                    <td>{{ lic.id }}</td>
+                    <td>{{ lic.customer.name }}</td>
+                    <td>{{ lic.product.name }}</td>
+                    <td>{{ lic.license_key }}</td>
+                    <td>{{ "Mensal" if lic.plan_type == "monthly" else "Anual" }}</td>
+                    <td>{{ lic.status }}</td>
+                    <td>{{ lic.expires_at.strftime('%d/%m/%Y') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel form-narrow">
+        <h3>Recuperar senha do administrador</h3>
+        <form method="post" action="/admin/reset-password">
+            <label>Email do administrador</label>
+            <input type="email" name="email" required>
+
+            <label>Nova senha</label>
+            <input type="password" name="new_password" required>
+
+            <button type="submit">Atualizar senha</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

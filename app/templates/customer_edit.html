@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Alterar cliente</h2>
+
+<section class="panel form-narrow">
+    <form method="post" action="/admin/customers/{{ customer.id }}/update">
+        <label>Nome</label>
+        <input type="text" name="name" value="{{ customer.name }}" required>
+
+        <label>Empresa</label>
+        <input type="text" name="company" value="{{ customer.company or '' }}">
+
+        <label>CPF/CNPJ</label>
+        <input type="text" name="cpf_cnpj" value="{{ customer.cpf_cnpj or '' }}">
+
+        <label>Email</label>
+        <input type="email" name="email" value="{{ customer.email or '' }}">
+
+        <label>Telefone</label>
+        <input type="text" name="phone" value="{{ customer.phone or '' }}">
+
+        <label>Observações</label>
+        <textarea name="notes" rows="4">{{ customer.notes or '' }}</textarea>
+
+        <div class="action-group">
+            <button type="submit">Salvar</button>
+            <a class="button-link button-secondary" href="/admin/customers">Cancelar</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

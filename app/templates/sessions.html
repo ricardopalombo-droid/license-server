@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-row">
+    <h2>Sessões da licença {{ license.license_key }}</h2>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button type="button" onclick="location.reload()">🔄 Atualizar</button>
+
+        <form method="post" action="/admin/licenses/{{ license.id }}/close-all-sessions" style="margin:0;">
+            <button type="submit">Encerrar todas</button>
+        </form>
+
+        <a class="button-link" href="/admin/licenses">Voltar</a>
+    </div>
+</div>
+
+<p>
+    <strong>Cliente:</strong> {{ license.customer.name }}<br>
+    <strong>Produto:</strong> {{ license.product.name }}<br>
+    <strong>Status:</strong> {{ license.status }}<br>
+    <strong>Sessões ativas:</strong>
+    {{ sessions | selectattr("status", "equalto", "active") | list | length }}
+</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Máquina</th>
+            <th>Machine ID</th>
+            <th>IP</th>
+            <th>Início</th>
+            <th>Último heartbeat</th>
+            <th>Status</th>
+            <th>Ação</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in sessions %}
+        <tr>
+            <td>{{ s.id }}</td>
+            <td>{{ s.machine_name or "" }}</td>
+            <td>{{ s.machine_id }}</td>
+            <td>{{ s.ip_address or "" }}</td>
+            <td>{{ s.started_at.strftime('%d/%m/%Y %H:%M:%S') if s.started_at else "" }}</td>
+            <td>{{ s.last_heartbeat_at.strftime('%d/%m/%Y %H:%M:%S') if s.last_heartbeat_at else "" }}</td>
+            <td>{{ s.status }}</td>
+            <td>
+                {% if s.status == "active" %}
+                <form method="post" action="/admin/sessions/{{ s.id }}/close">
+                    <button type="submit">Encerrar</button>
+                </form>
+                {% else %}
+                -
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+setTimeout(function () {
+    location.reload();
+}, 5000);
+</script>
+{% endblock %}

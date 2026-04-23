@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>{{ title if title else "Servidor de Licenças" }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="container topbar-flex">
+            <div>
+                <h1 class="logo">Servidor de Licenças</h1>
+            </div>
+            {% if admin %}
+            <nav class="menu">
+                <a href="/admin">Dashboard</a>
+                <a href="/admin/customers">Clientes</a>
+                <a href="/admin/products">Produtos</a>
+                <a href="/admin/licenses">Licenças</a>
+                <a href="/logout">Sair</a>
+            </nav>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

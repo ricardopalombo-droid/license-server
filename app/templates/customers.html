@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Clientes</h2>
+
+<div class="grid-2">
+    <section class="panel">
+        <h3>Novo cliente</h3>
+        <form method="post" action="/admin/customers">
+            <label>Nome</label>
+            <input type="text" name="name" required>
+
+            <label>Empresa</label>
+            <input type="text" name="company">
+
+            <label>CPF/CNPJ</label>
+            <input type="text" name="cpf_cnpj">
+
+            <label>Email</label>
+            <input type="email" name="email">
+
+            <label>Telefone</label>
+            <input type="text" name="phone">
+
+            <label>Observações</label>
+            <textarea name="notes" rows="4"></textarea>
+
+            <button type="submit">Salvar cliente</button>
+        </form>
+    </section>
+
+    <section class="panel">
+        <h3>Lista</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nome</th>
+                    <th>CPF/CNPJ</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in customers %}
+                <tr>
+                    <td>{{ c.id }}</td>
+                    <td>{{ c.name }}</td>
+                    <td>{{ c.cpf_cnpj or "" }}</td>
+                    <td>
+                        <div class="action-group">
+                            <a class="button-link" href="/admin/customers/{{ c.id }}/edit">Alterar</a>
+                            <form method="post" action="/admin/customers/{{ c.id }}/delete" onsubmit="return confirm('Excluir este cliente?');">
+                                <button type="submit">Excluir</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <p class="muted-note">A exclusão só é permitida para clientes sem licenças vinculadas.</p>
+    </section>
+</div>
+{% endblock %}
