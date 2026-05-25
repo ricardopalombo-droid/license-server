@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -27,8 +27,6 @@ def safe_admin(request: Request, db: Session):
 
 
 def cleanup_expired_sessions(db: Session):
-    from datetime import datetime
-
     limit = datetime.utcnow() - timedelta(minutes=settings.SESSION_TIMEOUT_MINUTES)
     sessions = db.query(LicenseSession).filter(
         LicenseSession.status == "active",
@@ -393,6 +391,80 @@ def licenses_create(
     return RedirectResponse(url="/admin/licenses", status_code=302)
 
 
+@router.get("/licenses/{license_id}/edit", response_class=HTMLResponse)
+def licenses_edit_page(license_id: int, request: Request, db: Session = Depends(get_db)):
+    admin = safe_admin(request, db)
+    if not admin:
+        return redirect_login()
+
+    lic = db.query(License).filter(License.id == license_id).first()
+    if not lic:
+        return RedirectResponse(url="/admin/licenses", status_code=302)
+
+    return templates.TemplateResponse(
+        "license_edit.html",
+        {"request": request, "admin": admin, "license": lic},
+    )
+
+
+@router.post("/licenses/{license_id}/update")
+def licenses_update(
+    license_id: int,
+    request: Request,
+    license_key: str = Form(...),
+    plan_type: str = Form(...),
+    status: str = Form(...),
+    max_concurrent_sessions: int = Form(...),
+    grace_days: int = Form(...),
+    expires_at_date: str = Form(...),
+    adjust_days: int = Form(0),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    admin = safe_admin(request, db)
+    if not admin:
+        return redirect_login()
+
+    lic = db.query(License).filter(License.id == license_id).first()
+    if not lic:
+        return RedirectResponse(url="/admin/licenses", status_code=302)
+
+    normalized_key = license_key.strip().upper()
+    existing_same_key = (
+        db.query(License)
+        .filter(License.license_key == normalized_key, License.id != license_id)
+        .first()
+    )
+    if existing_same_key:
+        return RedirectResponse(url=f"/admin/licenses/{license_id}/edit?error=license_key", status_code=302)
+
+    try:
+        parsed_date = datetime.strptime(expires_at_date.strip(), "%Y-%m-%d")
+    except ValueError:
+        return RedirectResponse(url=f"/admin/licenses/{license_id}/edit?error=expires_at", status_code=302)
+
+    current_expiration = lic.expires_at or datetime.utcnow()
+    updated_expiration = parsed_date.replace(
+        hour=current_expiration.hour,
+        minute=current_expiration.minute,
+        second=current_expiration.second,
+        microsecond=current_expiration.microsecond,
+    )
+    if adjust_days:
+        updated_expiration = updated_expiration + timedelta(days=adjust_days)
+
+    lic.license_key = normalized_key
+    lic.plan_type = plan_type
+    lic.status = status
+    lic.max_concurrent_sessions = max_concurrent_sessions
+    lic.grace_days = grace_days
+    lic.expires_at = updated_expiration
+    lic.notes = notes.strip() or None
+    db.commit()
+
+    return RedirectResponse(url="/admin/licenses", status_code=302)
+
+
 @router.post("/licenses/{license_id}/block")
 def block_license(license_id: int, request: Request, db: Session = Depends(get_db)):
     admin = safe_admin(request, db)
@@ -423,8 +495,6 @@ def unblock_license(license_id: int, request: Request, db: Session = Depends(get
 
 @router.post("/licenses/{license_id}/renew-monthly")
 def renew_monthly(license_id: int, request: Request, db: Session = Depends(get_db)):
-    from datetime import datetime
-
     admin = safe_admin(request, db)
     if not admin:
         return redirect_login()
@@ -443,8 +513,6 @@ def renew_monthly(license_id: int, request: Request, db: Session = Depends(get_d
 
 @router.post("/licenses/{license_id}/renew-annual")
 def renew_annual(license_id: int, request: Request, db: Session = Depends(get_db)):
-    from datetime import datetime
-
     admin = safe_admin(request, db)
     if not admin:
         return redirect_login()
@@ -487,8 +555,6 @@ def license_sessions(license_id: int, request: Request, db: Session = Depends(ge
 
 @router.post("/licenses/{license_id}/close-all-sessions")
 def close_all_sessions(license_id: int, request: Request, db: Session = Depends(get_db)):
-    from datetime import datetime
-
     admin = safe_admin(request, db)
     if not admin:
         return redirect_login()
@@ -509,8 +575,6 @@ def close_all_sessions(license_id: int, request: Request, db: Session = Depends(
 
 @router.post("/sessions/{session_id}/close")
 def close_session(session_id: int, request: Request, db: Session = Depends(get_db)):
-    from datetime import datetime
-
     admin = safe_admin(request, db)
     if not admin:
         return redirect_login()

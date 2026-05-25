@@ -46,6 +46,9 @@
 
             <td>
                 <div class="action-group" style="display:flex; flex-wrap:wrap; gap:5px;">
+                    <form method="get" action="/admin/licenses/{{ lic.id }}/edit">
+                        <button type="submit">Editar</button>
+                    </form>
 
                     <form method="post" action="/admin/licenses/{{ lic.id }}/block">
                         <button type="submit">Bloquear</button>
