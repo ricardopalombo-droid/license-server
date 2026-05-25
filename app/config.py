@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     APP_NAME: str = "Licenca Server"
-    DATABASE_URL: str = "sqlite:///./licencas.db"
+    DATABASE_URL: str = "sqlite:////data/licencas.db"
 
     SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
