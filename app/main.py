@@ -2,10 +2,12 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.database import engine, Base
+from app.bootstrap_restore import restore_initial_data_if_empty
 from app.routers import admin_auth, admin_web, client_license, webhook_mp
 from app.config import settings
 
 Base.metadata.create_all(bind=engine)
+restore_initial_data_if_empty()
 
 app = FastAPI(title=settings.APP_NAME)
 
