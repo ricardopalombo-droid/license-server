@@ -573,6 +573,36 @@ def close_all_sessions(license_id: int, request: Request, db: Session = Depends(
     return RedirectResponse(url=f"/admin/licenses/{license_id}/sessions", status_code=302)
 
 
+@router.post("/licenses/rotate-all-keys")
+def rotate_all_license_keys(request: Request, db: Session = Depends(get_db)):
+    admin = safe_admin(request, db)
+    if not admin:
+        return redirect_login()
+
+    existing_keys = {row[0] for row in db.query(License.license_key).all()}
+    licenses = db.query(License).order_by(License.id.asc()).all()
+
+    for lic in licenses:
+        old_key = lic.license_key
+        new_key = generate_license_key()
+        while new_key in existing_keys:
+            new_key = generate_license_key()
+        existing_keys.discard(old_key)
+        existing_keys.add(new_key)
+        lic.license_key = new_key
+
+    db.query(LicenseSession).filter(LicenseSession.status == "active").update(
+        {
+            LicenseSession.status: "closed",
+            LicenseSession.ended_at: datetime.utcnow(),
+        },
+        synchronize_session=False,
+    )
+    db.commit()
+
+    return RedirectResponse(url="/admin/licenses?rotated=1", status_code=302)
+
+
 @router.post("/sessions/{session_id}/close")
 def close_session(session_id: int, request: Request, db: Session = Depends(get_db)):
     admin = safe_admin(request, db)

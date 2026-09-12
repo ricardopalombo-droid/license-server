@@ -38,7 +38,7 @@ SEED_DATA = {
         },
     ],
     "products": [
-        {"id": 1, "name": "Cadastros de Funcionários", "code": "1", "is_active": 1},
+        {"id": 1, "name": "Cadastros de funcionários via planilha", "code": "1", "is_active": 1},
         {"id": 2, "name": "Fator R - Folha", "code": "2", "is_active": 1},
         {"id": 3, "name": "Receitas JR Phoenix para Folha", "code": "3", "is_active": 1},
         {"id": 4, "name": "Geração da SEDIF", "code": "4", "is_active": 1},
@@ -46,11 +46,16 @@ SEED_DATA = {
         {"id": 6, "name": "Controle Receita MEI", "code": "6", "is_active": 1},
         {"id": 7, "name": "Análise Razão", "code": "7", "is_active": 1},
         {"id": 8, "name": "Conversor de Extratos", "code": "8", "is_active": 1},
-        {"id": 9, "name": "Monitor + Envio WhatsApp", "code": "9", "is_active": 1},
+        {"id": 9, "name": "Envio Automático de Documentos por WhatsApp", "code": "9", "is_active": 1},
         {"id": 10, "name": "Apuração DRE + Reinf R-4000", "code": "10", "is_active": 1},
-        {"id": 11, "name": "Monitor + Envio e-mail", "code": "11", "is_active": 1},
-        {"id": 12, "name": "Download em lote guia FGTS", "code": "12", "is_active": 1},
-        {"id": 13, "name": "Recibos Ecac - REINF e DCTFWeb", "code": "13", "is_active": 1},
+        {"id": 11, "name": "Envio Automático de Documentos por E-mail", "code": "11", "is_active": 1},
+        {"id": 12, "name": "Importação guia rápida - FGTS Digital", "code": "12", "is_active": 1},
+        {"id": 13, "name": "eCAC / Recibos REINF e DCTFWeb", "code": "13", "is_active": 1},
+        {"id": 14, "name": "PalSys - Consulta DCTFWeb - Integra Contador", "code": "14", "is_active": 1},
+        {"id": 15, "name": "PDF Monitor", "code": "15", "is_active": 1},
+        {"id": 16, "name": "Cadastro automatizado de funcionários", "code": "16", "is_active": 1},
+        {"id": 17, "name": "Consolida Impostos", "code": "17", "is_active": 1},
+        {"id": 18, "name": "Consolidador de Folhas", "code": "18", "is_active": 1},
     ],
     "licenses": [
         {
@@ -143,6 +148,23 @@ def _parse_dt(value: str | None):
     return datetime.fromisoformat(value)
 
 
+def ensure_site_products(db):
+    """Mantém cadastrados os produtos exibidos na página de assinatura."""
+    for item in SEED_DATA["products"]:
+        product = db.query(Product).filter(Product.code == item["code"]).first()
+        if product:
+            product.name = item["name"]
+            product.is_active = bool(item["is_active"])
+            continue
+
+        product = Product(
+            name=item["name"],
+            code=item["code"],
+            is_active=bool(item["is_active"]),
+        )
+        db.add(product)
+
+
 def restore_initial_data_if_empty():
     db = SessionLocal()
     try:
@@ -191,6 +213,8 @@ def restore_initial_data_if_empty():
                 ]
             )
 
+        db.commit()
+        ensure_site_products(db)
         db.commit()
 
         if db.query(License).count() == 0:

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
-from app.models import License, LicenseSession
+from app.models import License, LicenseSession, Product
 from app.schemas import ActivateRequest, HeartbeatRequest, ReleaseRequest
 
 router = APIRouter(prefix="/client", tags=["client"])
@@ -34,9 +34,21 @@ def activate_license(data: ActivateRequest, request: Request, db: Session = Depe
 
     cleanup_expired_sessions(db, settings.SESSION_TIMEOUT_MINUTES)
 
-    lic = db.query(License).filter(License.license_key == data.license_key).first()
+    product_code = data.product_code.strip().upper()
+    lic = (
+        db.query(License)
+        .join(Product)
+        .filter(
+            License.license_key == data.license_key.strip().upper(),
+            Product.code == product_code,
+        )
+        .first()
+    )
     if not lic:
-        raise HTTPException(status_code=404, detail="Licença não encontrada")
+        raise HTTPException(status_code=404, detail="Licença não encontrada para este sistema")
+
+    if not lic.product.is_active:
+        raise HTTPException(status_code=403, detail="Produto inativo")
 
     if lic.status == "blocked":
         raise HTTPException(status_code=403, detail="Licença bloqueada")
@@ -84,6 +96,8 @@ def activate_license(data: ActivateRequest, request: Request, db: Session = Depe
         "offline_until": offline_until.isoformat(),
         "heartbeat_seconds": 120,
         "license_key": lic.license_key,
+        "product_code": lic.product.code,
+        "product_name": lic.product.name,
         "machine_id": data.machine_id,
         "customer_name": lic.customer.company or lic.customer.name,
     }

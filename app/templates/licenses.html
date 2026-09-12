@@ -3,8 +3,18 @@
 {% block content %}
 <div class="header-row">
     <h2>Licenças</h2>
-    <a class="button-link" href="/admin/licenses/new">Nova licença</a>
+    <div style="display:flex; gap:8px; align-items:center;">
+        <form method="post" action="/admin/licenses/rotate-all-keys"
+              onsubmit="return confirm('Deseja trocar TODAS as chaves de licença? Cliente, produto, plano e vencimento serão mantidos.');">
+            <button type="submit" style="background:#c9302c; color:white;">Trocar todas as chaves</button>
+        </form>
+        <a class="button-link" href="/admin/licenses/new">Nova licença</a>
+    </div>
 </div>
+
+{% if request.query_params.get("rotated") == "1" %}
+<p style="color:#3c763d; margin-top:0;">Todas as chaves foram trocadas. As demais informações das licenças foram mantidas.</p>
+{% endif %}
 
 <table>
     <thead>

@@ -31,6 +31,7 @@ class LicenseCreate(BaseModel):
 
 class ActivateRequest(BaseModel):
     license_key: str
+    product_code: str
     machine_id: str
     machine_name: str | None = None
 
