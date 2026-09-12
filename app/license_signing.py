@@ -11,6 +11,11 @@ def _get_signing_key() -> SigningKey:
     return SigningKey(raw)
 
 
+def get_public_key_base64() -> str:
+    signing_key = _get_signing_key()
+    return base64.b64encode(bytes(signing_key.verify_key)).decode("utf-8")
+
+
 def serialize_payload(payload: dict) -> bytes:
     return json.dumps(
         payload,

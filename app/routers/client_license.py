@@ -11,6 +11,13 @@ from app.schemas import ActivateRequest, HeartbeatRequest, ReleaseRequest
 router = APIRouter(prefix="/client", tags=["client"])
 
 
+@router.get("/public-key")
+def public_key():
+    from app.license_signing import get_public_key_base64
+
+    return {"public_key": get_public_key_base64()}
+
+
 def cleanup_expired_sessions(db: Session, timeout_minutes: int):
     limit = datetime.utcnow() - timedelta(minutes=timeout_minutes)
     sessions = db.query(LicenseSession).filter(
