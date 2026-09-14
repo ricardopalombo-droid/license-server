@@ -165,6 +165,24 @@ def ensure_site_products(db):
         db.add(product)
 
 
+def merge_duplicate_dctfweb_product(db):
+    """
+    Produto 19 foi criado como duplicado do produto 14.
+    Mantém as licenças existentes, apenas troca o vínculo para o produto correto.
+    """
+    product_14 = db.query(Product).filter(Product.code == "14").first()
+    product_19 = db.query(Product).filter(Product.code == "19").first()
+    if not product_14 or not product_19:
+        return
+
+    db.query(License).filter(License.product_id == product_19.id).update(
+        {License.product_id: product_14.id},
+        synchronize_session=False,
+    )
+    product_19.is_active = False
+    product_19.name = "ECAC - Integra Contador (unificado no produto 14)"
+
+
 def restore_initial_data_if_empty():
     db = SessionLocal()
     try:
@@ -215,6 +233,7 @@ def restore_initial_data_if_empty():
 
         db.commit()
         ensure_site_products(db)
+        merge_duplicate_dctfweb_product(db)
         db.commit()
 
         if db.query(License).count() == 0:
