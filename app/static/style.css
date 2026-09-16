@@ -202,6 +202,40 @@ th {
     color: #556070;
 }
 
+.usage-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.usage-active {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.usage-empty {
+    background: #eef2f7;
+    color: #475569;
+}
+
+.usage-details {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+    color: #475569;
+    font-size: 12px;
+    line-height: 1.35;
+    max-width: 260px;
+}
+
+.usage-details span {
+    word-break: break-word;
+}
+
 @media (min-width: 980px) {
     .dashboard-stack {
         grid-template-columns: 1fr;
