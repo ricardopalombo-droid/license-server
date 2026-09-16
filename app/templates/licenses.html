@@ -17,14 +17,11 @@
             <th>Status</th>
             <th>Vencimento</th>
             <th>Sessões</th>
-            <th>Em uso agora</th>
             <th>Ações</th>
         </tr>
     </thead>
     <tbody>
         {% for lic in licenses %}
-        {% set active_sessions = active_sessions_by_license.get(lic.id, []) %}
-        {% set active_count = active_sessions | length %}
         <tr>
             <td>{{ lic.id }}</td>
             <td>{{ lic.customer.company or lic.customer.name }}</td>
@@ -46,29 +43,6 @@
             </td>
             <td>{{ lic.expires_at.strftime('%d/%m/%Y') if lic.expires_at else "" }}</td>
             <td>{{ lic.max_concurrent_sessions }}</td>
-            <td>
-                {% if active_count > 0 %}
-                <div class="usage-badge usage-active">
-                    {{ active_count }}/{{ lic.max_concurrent_sessions }} em uso
-                </div>
-                <div class="usage-details">
-                    {% for session in active_sessions %}
-                    <div>
-                        <strong>{{ session.machine_name or "Máquina sem nome" }}</strong><br>
-                        <span>{{ session.machine_id }}</span><br>
-                        <span>
-                            Último sinal:
-                            {{ session.last_heartbeat_at.strftime('%d/%m/%Y %H:%M:%S') if session.last_heartbeat_at else "" }}
-                        </span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <div class="usage-badge usage-empty">
-                    0/{{ lic.max_concurrent_sessions }} livre
-                </div>
-                {% endif %}
-            </td>
 
             <td>
                 <div class="action-group" style="display:flex; flex-wrap:wrap; gap:5px;">

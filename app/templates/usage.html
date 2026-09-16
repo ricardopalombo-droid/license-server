@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-row">
+    <div>
+        <h2>Uso em tempo real</h2>
+        <p class="muted-note">
+            Acompanhe quais licenças estão abertas agora. A tela atualiza automaticamente.
+        </p>
+    </div>
+    <button type="button" id="refresh-usage">Atualizar agora</button>
+</div>
+
+<div id="usage-panel">
+    {% include "usage_panel_content.html" %}
+</div>
+
+<script>
+const panel = document.getElementById("usage-panel")
+const refreshButton = document.getElementById("refresh-usage")
+
+async function refreshUsage() {
+    try {
+        const response = await fetch("/admin/usage/partial", { cache: "no-store" })
+        if (!response.ok) {
+            return
+        }
+        panel.innerHTML = await response.text()
+    } catch (error) {
+        console.error("Falha ao atualizar painel de uso", error)
+    }
+}
+
+refreshButton.addEventListener("click", refreshUsage)
+setInterval(refreshUsage, 5000)
+</script>
+{% endblock %}

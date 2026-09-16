@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -27,8 +27,6 @@ def safe_admin(request: Request, db: Session):
 
 
 def cleanup_expired_sessions(db: Session):
-    from datetime import datetime
-
     limit = datetime.utcnow() - timedelta(minutes=settings.SESSION_TIMEOUT_MINUTES)
     sessions = db.query(LicenseSession).filter(
         LicenseSession.status == "active",
@@ -43,6 +41,33 @@ def cleanup_expired_sessions(db: Session):
 
     if changed:
         db.commit()
+
+
+def usage_context(db: Session):
+    cleanup_expired_sessions(db)
+
+    active_sessions = (
+        db.query(LicenseSession)
+        .join(License)
+        .filter(LicenseSession.status == "active")
+        .order_by(LicenseSession.last_heartbeat_at.desc())
+        .all()
+    )
+    active_licenses = db.query(License).filter(License.status == "active").all()
+    licenses_in_use = {session.license_id for session in active_sessions}
+    total_capacity = sum((lic.max_concurrent_sessions or 0) for lic in active_licenses)
+    usage_percent = round((len(active_sessions) / total_capacity) * 100) if total_capacity else 0
+
+    return {
+        "active_sessions": active_sessions,
+        "active_sessions_count": len(active_sessions),
+        "licenses_in_use_count": len(licenses_in_use),
+        "active_licenses_count": len(active_licenses),
+        "total_capacity": total_capacity,
+        "usage_percent": usage_percent,
+        "updated_at": datetime.utcnow(),
+        "session_timeout_minutes": settings.SESSION_TIMEOUT_MINUTES,
+    }
 
 
 @router.get("", response_class=HTMLResponse)
@@ -76,6 +101,30 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             "recent_licenses": recent_licenses,
         },
     )
+
+
+@router.get("/usage", response_class=HTMLResponse)
+def usage_page(request: Request, db: Session = Depends(get_db)):
+    admin = safe_admin(request, db)
+    if not admin:
+        return redirect_login()
+
+    context = usage_context(db)
+    context.update({"request": request, "admin": admin})
+
+    return templates.TemplateResponse("usage.html", context)
+
+
+@router.get("/usage/partial", response_class=HTMLResponse)
+def usage_partial(request: Request, db: Session = Depends(get_db)):
+    admin = safe_admin(request, db)
+    if not admin:
+        return redirect_login()
+
+    context = usage_context(db)
+    context.update({"request": request, "admin": admin})
+
+    return templates.TemplateResponse("usage_panel_content.html", context)
 
 
 @router.get("/customers", response_class=HTMLResponse)
@@ -340,25 +389,10 @@ def licenses_page(request: Request, db: Session = Depends(get_db)):
 
     cleanup_expired_sessions(db)
     licenses = db.query(License).order_by(License.id.desc()).all()
-    active_sessions = (
-        db.query(LicenseSession)
-        .filter(LicenseSession.status == "active")
-        .order_by(LicenseSession.last_heartbeat_at.desc())
-        .all()
-    )
-
-    active_sessions_by_license = {}
-    for session in active_sessions:
-        active_sessions_by_license.setdefault(session.license_id, []).append(session)
 
     return templates.TemplateResponse(
         "licenses.html",
-        {
-            "request": request,
-            "admin": admin,
-            "licenses": licenses,
-            "active_sessions_by_license": active_sessions_by_license,
-        },
+        {"request": request, "admin": admin, "licenses": licenses},
     )
 
 
@@ -539,6 +573,22 @@ def close_session(session_id: int, request: Request, db: Session = Depends(get_d
         db.commit()
 
     return RedirectResponse(url=f"/admin/licenses/{redirect_id}/sessions", status_code=302)
+
+
+@router.post("/usage/sessions/{session_id}/close")
+def close_session_from_usage(session_id: int, request: Request, db: Session = Depends(get_db)):
+    admin = safe_admin(request, db)
+    if not admin:
+        return redirect_login()
+
+    session = db.query(LicenseSession).filter(LicenseSession.id == session_id).first()
+
+    if session and session.status == "active":
+        session.status = "closed"
+        session.ended_at = datetime.utcnow()
+        db.commit()
+
+    return RedirectResponse(url="/admin/usage", status_code=302)
 
 @router.post("/licenses/{license_id}/delete")
 def delete_license(license_id: int, request: Request, db: Session = Depends(get_db)):

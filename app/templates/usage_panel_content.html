@@ -1,0 +1,83 @@
+<div class="usage-live-meta">
+    <span>Atualizado em {{ updated_at.strftime('%d/%m/%Y %H:%M:%S') }}</span>
+    <span>Sessão sem heartbeat por {{ session_timeout_minutes }} min é marcada como timeout.</span>
+</div>
+
+<div class="cards usage-cards">
+    <div class="card">
+        <strong>Sessões em uso</strong>
+        <span>{{ active_sessions_count }}</span>
+    </div>
+    <div class="card">
+        <strong>Licenças em uso</strong>
+        <span>{{ licenses_in_use_count }}</span>
+    </div>
+    <div class="card">
+        <strong>Licenças ativas</strong>
+        <span>{{ active_licenses_count }}</span>
+    </div>
+    <div class="card">
+        <strong>Capacidade total</strong>
+        <span>{{ total_capacity }}</span>
+    </div>
+    <div class="card">
+        <strong>Uso da capacidade</strong>
+        <span>{{ usage_percent }}%</span>
+    </div>
+</div>
+
+<section class="panel">
+    <div class="header-row">
+        <h3>Licenças abertas agora</h3>
+        <span class="usage-badge {{ 'usage-active' if active_sessions_count else 'usage-empty' }}">
+            {{ active_sessions_count }} em uso
+        </span>
+    </div>
+
+    {% if active_sessions %}
+    <table class="usage-live-table">
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Produto</th>
+                <th>Máquina</th>
+                <th>IP</th>
+                <th>Início</th>
+                <th>Último sinal</th>
+                <th>Licença</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for session in active_sessions %}
+            <tr>
+                <td>
+                    <strong>{{ session.license.customer.company or session.license.customer.name }}</strong><br>
+                    <span class="muted-inline">{{ session.license.customer.email or "" }}</span>
+                </td>
+                <td>{{ session.license.product.name }}</td>
+                <td>
+                    <strong>{{ session.machine_name or "Máquina sem nome" }}</strong><br>
+                    <span class="muted-inline">{{ session.machine_id }}</span>
+                </td>
+                <td>{{ session.ip_address or "" }}</td>
+                <td>{{ session.started_at.strftime('%d/%m/%Y %H:%M:%S') if session.started_at else "" }}</td>
+                <td>{{ session.last_heartbeat_at.strftime('%d/%m/%Y %H:%M:%S') if session.last_heartbeat_at else "" }}</td>
+                <td>
+                    <span class="license-key-short">{{ session.license.license_key }}</span>
+                </td>
+                <td>
+                    <form method="post" action="/admin/usage/sessions/{{ session.id }}/close">
+                        <button type="submit">Encerrar</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        Nenhuma licença em uso no momento.
+    </div>
+    {% endif %}
+</section>

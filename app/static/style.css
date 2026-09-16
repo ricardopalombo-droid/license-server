@@ -236,6 +236,47 @@ th {
     word-break: break-word;
 }
 
+.usage-live-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: space-between;
+    margin: 10px 0 16px;
+    color: #556070;
+    font-size: 14px;
+}
+
+.usage-cards {
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.usage-live-table th,
+.usage-live-table td {
+    font-size: 14px;
+}
+
+.muted-inline {
+    color: #64748b;
+    font-size: 12px;
+    word-break: break-word;
+}
+
+.license-key-short {
+    display: inline-block;
+    max-width: 180px;
+    overflow-wrap: anywhere;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+}
+
+.empty-state {
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+    color: #64748b;
+    padding: 28px;
+    text-align: center;
+}
+
 @media (min-width: 980px) {
     .dashboard-stack {
         grid-template-columns: 1fr;
