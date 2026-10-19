@@ -52,9 +52,9 @@ SEED_DATA = {
         {"id": 12, "name": "Importação guia rápida - FGTS Digital", "code": "12", "is_active": 1},
         {"id": 13, "name": "eCAC / Recibos REINF e DCTFWeb", "code": "13", "is_active": 1},
         {"id": 14, "name": "PalSys - Consulta DCTFWeb - Integra Contador", "code": "14", "is_active": 1},
-        {"id": 15, "name": "PDF Monitor", "code": "15", "is_active": 1},
+        {"id": 15, "name": "PalSys PDF Printer", "code": "15", "is_active": 1},
         {"id": 16, "name": "Cadastro automatizado de funcionários", "code": "16", "is_active": 1},
-        {"id": 17, "name": "Consolida Impostos", "code": "17", "is_active": 1},
+        {"id": 17, "name": "Central de documentos", "code": "17", "is_active": 1},
         {"id": 18, "name": "Consolidador de Folhas", "code": "18", "is_active": 1},
     ],
     "licenses": [
@@ -149,12 +149,10 @@ def _parse_dt(value: str | None):
 
 
 def ensure_site_products(db):
-    """Mantém cadastrados os produtos exibidos na página de assinatura."""
+    """Cadastra produtos ausentes sem sobrescrever edições feitas no painel."""
     for item in SEED_DATA["products"]:
         product = db.query(Product).filter(Product.code == item["code"]).first()
         if product:
-            product.name = item["name"]
-            product.is_active = bool(item["is_active"])
             continue
 
         product = Product(
@@ -163,6 +161,19 @@ def ensure_site_products(db):
             is_active=bool(item["is_active"]),
         )
         db.add(product)
+
+
+def repair_legacy_product_names(db):
+    """Corrige nomes antigos conhecidos uma única vez, sem fixar nomes futuros."""
+    legacy_names = {
+        "15": ("PDF Monitor", "PalSys PDF Printer"),
+        "17": ("Consolida Impostos", "Central de documentos"),
+    }
+
+    for code, (old_name, new_name) in legacy_names.items():
+        product = db.query(Product).filter(Product.code == code).first()
+        if product and product.name.strip().casefold() == old_name.casefold():
+            product.name = new_name
 
 
 def merge_duplicate_dctfweb_product(db):
@@ -233,6 +244,7 @@ def restore_initial_data_if_empty():
 
         db.commit()
         ensure_site_products(db)
+        repair_legacy_product_names(db)
         merge_duplicate_dctfweb_product(db)
         db.commit()
 
