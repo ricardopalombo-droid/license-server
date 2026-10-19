@@ -68,6 +68,18 @@ def activate_license(data: ActivateRequest, request: Request, db: Session = Depe
         db.commit()
         raise HTTPException(status_code=403, detail="Licença vencida")
 
+    existing_machine_sessions = db.query(LicenseSession).filter(
+        LicenseSession.license_id == lic.id,
+        LicenseSession.machine_id == data.machine_id,
+        LicenseSession.status == "active",
+    ).all()
+    for session in existing_machine_sessions:
+        session.status = "closed"
+        session.ended_at = datetime.utcnow()
+
+    if existing_machine_sessions:
+        db.commit()
+
     active_count = db.query(LicenseSession).filter(
         LicenseSession.license_id == lic.id,
         LicenseSession.status == "active",
