@@ -277,6 +277,32 @@ th {
     text-align: center;
 }
 
+.credit-fieldset {
+    margin: 22px 0;
+    padding: 18px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #f8fbff;
+}
+
+.credit-fieldset legend {
+    padding: 0 8px;
+    color: #174ea6;
+    font-weight: 700;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 16px;
+}
+
+.checkbox-row input {
+    width: auto;
+    margin: 0;
+}
+
 @media (min-width: 980px) {
     .dashboard-stack {
         grid-template-columns: 1fr;

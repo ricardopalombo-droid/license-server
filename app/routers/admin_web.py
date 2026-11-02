@@ -6,7 +6,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.dependencies import get_db, get_current_admin
-from app.models import AdminUser, Customer, Product, License, LicenseSession
+from app.models import (
+    AdminUser, Customer, Product, License, LicenseSession,
+    LicenseCreditAccount, CreditEntitlement, CreditLedger, CreditPurchase, CreditQuote, CreditQuoteItem,
+)
 from app.utils import generate_license_key, plan_expiration
 from app.config import settings
 from app.security import get_password_hash
@@ -454,7 +457,7 @@ def licenses_edit_page(license_id: int, request: Request, db: Session = Depends(
 
     return templates.TemplateResponse(
         "license_edit.html",
-        {"request": request, "admin": admin, "license": lic},
+        {"request": request, "admin": admin, "license": lic, "credit_account": lic.credit_account, "default_credit_price": settings.AUDITOR_CREDIT_PRICE_CENTS},
     )
 
 
@@ -470,6 +473,9 @@ def licenses_update(
     expires_at_date: str = Form(...),
     adjust_days: int = Form(0),
     notes: str = Form(""),
+    credit_enabled: str | None = Form(None),
+    credit_unit_price_cents: int = Form(...),
+    add_credits: int = Form(0),
     db: Session = Depends(get_db),
 ):
     admin = safe_admin(request, db)
@@ -517,6 +523,32 @@ def licenses_update(
     lic.grace_days = grace_days
     lic.expires_at = updated_expiration
     lic.notes = notes.strip() or None
+    account = lic.credit_account
+    if account is None and (credit_enabled or add_credits or credit_unit_price_cents != settings.AUDITOR_CREDIT_PRICE_CENTS):
+        account = LicenseCreditAccount(
+            license_id=lic.id,
+            enabled=False,
+            balance=0,
+            unit_price_cents=settings.AUDITOR_CREDIT_PRICE_CENTS,
+        )
+        db.add(account)
+        db.flush()
+    if account is not None:
+        account.enabled = credit_enabled == "on"
+        account.unit_price_cents = max(1, credit_unit_price_cents)
+        if add_credits:
+            new_balance = max(0, account.balance + add_credits)
+            applied = new_balance - account.balance
+            account.balance = new_balance
+            if applied:
+                db.add(CreditLedger(
+                    account_id=account.id,
+                    delta=applied,
+                    balance_after=account.balance,
+                    event_type="admin_adjustment",
+                    reference=f"admin:{admin.id}",
+                    notes="Créditos ajustados pelo painel administrativo.",
+                ))
     db.commit()
 
     return RedirectResponse(url="/admin/licenses", status_code=302)
@@ -689,6 +721,25 @@ def delete_license(license_id: int, request: Request, db: Session = Depends(get_
     if active_sessions:
         # não permite excluir se houver sessão ativa
         return RedirectResponse(url="/admin/licenses", status_code=302)
+
+    quote_ids = [row[0] for row in db.query(CreditQuote.id).filter(
+        CreditQuote.license_id == license_id
+    ).all()]
+    if quote_ids:
+        db.query(CreditQuoteItem).filter(
+            CreditQuoteItem.quote_id.in_(quote_ids)
+        ).delete(synchronize_session=False)
+    db.query(CreditQuote).filter(CreditQuote.license_id == license_id).delete()
+    db.query(CreditEntitlement).filter(CreditEntitlement.license_id == license_id).delete()
+    db.query(CreditPurchase).filter(CreditPurchase.license_id == license_id).update(
+        {CreditPurchase.license_id: None}, synchronize_session=False
+    )
+    account = db.query(LicenseCreditAccount).filter(
+        LicenseCreditAccount.license_id == license_id
+    ).first()
+    if account:
+        db.query(CreditLedger).filter(CreditLedger.account_id == account.id).delete()
+        db.delete(account)
 
     # Remove sessões antigas (histórico)
     db.query(LicenseSession).filter(

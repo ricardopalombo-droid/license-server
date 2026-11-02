@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -67,6 +67,10 @@ class License(Base):
     customer = relationship("Customer", back_populates="licenses")
     product = relationship("Product", back_populates="licenses")
     sessions = relationship("LicenseSession", back_populates="license")
+    credit_account = relationship(
+        "LicenseCreditAccount", back_populates="license", uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class LicenseSession(Base):
@@ -86,3 +90,105 @@ class LicenseSession(Base):
     status = Column(String(20), default="active")
 
     license = relationship("License", back_populates="sessions")
+
+
+class LicenseCreditAccount(Base):
+    __tablename__ = "license_credit_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    license_id = Column(Integer, ForeignKey("licenses.id"), unique=True, nullable=False, index=True)
+    enabled = Column(Boolean, default=False, nullable=False)
+    balance = Column(Integer, default=0, nullable=False)
+    unit_price_cents = Column(Integer, default=500, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    license = relationship("License", back_populates="credit_account")
+    ledger = relationship("CreditLedger", back_populates="account", cascade="all, delete-orphan")
+
+
+class CreditEntitlement(Base):
+    __tablename__ = "credit_entitlements"
+    __table_args__ = (
+        UniqueConstraint("license_id", "company_hash", "competence", name="uq_credit_entitlement"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    license_id = Column(Integer, ForeignKey("licenses.id"), nullable=False, index=True)
+    company_hash = Column(String(64), nullable=False, index=True)
+    competence = Column(String(7), nullable=False, index=True)
+    company_alias = Column(String(80), nullable=True)
+    company_name = Column(String(180), nullable=True)
+    unlocked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CreditQuote(Base):
+    __tablename__ = "credit_quotes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    quote_id = Column(String(100), unique=True, nullable=False, index=True)
+    reservation_id = Column(String(100), unique=True, nullable=True, index=True)
+    license_id = Column(Integer, ForeignKey("licenses.id"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("license_sessions.id"), nullable=False, index=True)
+    status = Column(String(20), default="quoted", nullable=False, index=True)
+    total_items = Column(Integer, default=0, nullable=False)
+    unlocked_items = Column(Integer, default=0, nullable=False)
+    required_credits = Column(Integer, default=0, nullable=False)
+    unit_price_cents = Column(Integer, default=500, nullable=False)
+    balance_before = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    reserved_at = Column(DateTime, nullable=True)
+    committed_at = Column(DateTime, nullable=True)
+
+    items = relationship("CreditQuoteItem", back_populates="quote", cascade="all, delete-orphan")
+
+
+class CreditQuoteItem(Base):
+    __tablename__ = "credit_quote_items"
+    __table_args__ = (
+        UniqueConstraint("quote_id", "company_hash", "competence", name="uq_credit_quote_item"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    quote_id = Column(Integer, ForeignKey("credit_quotes.id"), nullable=False, index=True)
+    company_hash = Column(String(64), nullable=False)
+    competence = Column(String(7), nullable=False)
+    company_alias = Column(String(80), nullable=True)
+    company_name = Column(String(180), nullable=True)
+    is_new = Column(Boolean, default=True, nullable=False)
+
+    quote = relationship("CreditQuote", back_populates="items")
+
+
+class CreditLedger(Base):
+    __tablename__ = "credit_ledger"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("license_credit_accounts.id"), nullable=False, index=True)
+    delta = Column(Integer, nullable=False)
+    balance_after = Column(Integer, nullable=False)
+    event_type = Column(String(30), nullable=False, index=True)
+    reference = Column(String(120), nullable=True, index=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    account = relationship("LicenseCreditAccount", back_populates="ledger")
+
+
+class CreditPurchase(Base):
+    __tablename__ = "credit_purchases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(String(100), unique=True, nullable=False, index=True)
+    payment_id = Column(String(100), unique=True, nullable=True, index=True)
+    license_id = Column(Integer, ForeignKey("licenses.id"), nullable=True, index=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+    customer_email = Column(String(150), nullable=False, index=True)
+    customer_name = Column(String(150), nullable=True)
+    quantity = Column(Integer, nullable=False)
+    unit_price_cents = Column(Integer, nullable=False)
+    amount_cents = Column(Integer, nullable=False)
+    status = Column(String(20), default="pending", nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    paid_at = Column(DateTime, nullable=True)

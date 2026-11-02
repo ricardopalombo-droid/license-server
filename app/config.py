@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     SESSION_TIMEOUT_MINUTES: int = 10
     OFFLINE_GRACE_DAYS: int = 4
+    AUDITOR_CREDIT_PRICE_CENTS: int = 500
 
     # SEGURANÇA WEBHOOK
     LICENSE_API_TOKEN: str

@@ -44,6 +44,28 @@ class ReleaseRequest(BaseModel):
     session_token: str
 
 
+class CreditItem(BaseModel):
+    company_key: str = Field(min_length=8, max_length=30)
+    company_alias: str | None = Field(default=None, max_length=80)
+    company_name: str | None = Field(default=None, max_length=180)
+    competence: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+
+
+class CreditQuoteRequest(BaseModel):
+    session_token: str
+    items: list[CreditItem] = Field(min_length=1, max_length=10000)
+
+
+class CreditQuoteOperation(BaseModel):
+    session_token: str
+    quote_id: str
+
+
+class CreditReservationOperation(BaseModel):
+    session_token: str
+    reservation_id: str
+
+
 class ActivateResponse(BaseModel):
     ok: bool
     session_token: str

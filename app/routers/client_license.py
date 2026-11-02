@@ -119,6 +119,9 @@ def activate_license(data: ActivateRequest, request: Request, db: Session = Depe
         "product_name": lic.product.name,
         "machine_id": data.machine_id,
         "customer_name": lic.customer.company or lic.customer.name,
+        "credit_billing_enabled": bool(lic.credit_account and lic.credit_account.enabled),
+        "credit_balance": lic.credit_account.balance if lic.credit_account and lic.credit_account.enabled else None,
+        "credit_unit_price_cents": lic.credit_account.unit_price_cents if lic.credit_account and lic.credit_account.enabled else 500,
     }
 
     signature = sign_payload(payload)

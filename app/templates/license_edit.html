@@ -22,6 +22,7 @@
         <select name="plan_type" required>
             <option value="monthly" {% if license.plan_type == "monthly" %}selected{% endif %}>Mensal</option>
             <option value="annual" {% if license.plan_type == "annual" %}selected{% endif %}>Anual</option>
+            <option value="credits" {% if license.plan_type == "credits" %}selected{% endif %}>Créditos</option>
         </select>
 
         <label>Status</label>
@@ -47,6 +48,22 @@
 
         <label>Observações</label>
         <textarea name="notes" rows="4">{{ license.notes or "" }}</textarea>
+
+        <fieldset class="credit-fieldset">
+            <legend>Créditos por empresa e competência</legend>
+            <label class="checkbox-row">
+                <input type="checkbox" name="credit_enabled" {% if credit_account and credit_account.enabled %}checked{% endif %}>
+                Habilitar cobrança por créditos nesta licença
+            </label>
+
+            <label>Valor de referência por crédito (centavos)</label>
+            <input type="number" name="credit_unit_price_cents" value="{{ credit_account.unit_price_cents if credit_account else default_credit_price }}" min="1" required>
+            <p class="muted-note">500 corresponde a R$ 5,00. O preço pode mudar sem reduzir os créditos já comprados.</p>
+
+            <label>Adicionar ou retirar créditos</label>
+            <input type="number" name="add_credits" value="0" min="-100000" max="1000000">
+            <p class="muted-note">Saldo atual: <strong>{{ credit_account.balance if credit_account else 0 }} crédito(s)</strong>. Use número negativo para corrigir o saldo.</p>
+        </fieldset>
 
         <button type="submit">Salvar alterações</button>
     </form>
