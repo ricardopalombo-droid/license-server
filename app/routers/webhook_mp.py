@@ -78,6 +78,8 @@ def enviar_email_creditos(destinatario: str, license_key: str, quantity: int, ba
         f"Créditos adicionados: {quantity}\n"
         f"Saldo atual: {balance}\n"
         f"Chave da licença: {license_key}\n\n"
+        "Baixar o PalSys Auditor Integrado:\n"
+        "https://www.palsys.com.br/api/download/auditor-integrado\n\n"
         "Cada crédito libera uma empresa em uma competência. "
         "Competências já liberadas podem ser reprocessadas sem novo consumo."
     )
