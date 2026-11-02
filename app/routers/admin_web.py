@@ -455,9 +455,47 @@ def licenses_edit_page(license_id: int, request: Request, db: Session = Depends(
     if not lic:
         return RedirectResponse(url="/admin/licenses", status_code=302)
 
+    credit_company = request.query_params.get("credit_company", "").strip()
+    credit_competence = request.query_params.get("credit_competence", "").strip()
+    entitlement_query = db.query(CreditEntitlement).filter(
+        CreditEntitlement.license_id == lic.id
+    )
+    total_entitlements = entitlement_query.count()
+    if credit_company:
+        company_filter = f"%{credit_company}%"
+        entitlement_query = entitlement_query.filter(
+            (CreditEntitlement.company_alias.ilike(company_filter))
+            | (CreditEntitlement.company_name.ilike(company_filter))
+        )
+    if credit_competence:
+        entitlement_query = entitlement_query.filter(
+            CreditEntitlement.competence == credit_competence
+        )
+    filtered_entitlements = entitlement_query.count()
+    entitlements = entitlement_query.order_by(
+        CreditEntitlement.unlocked_at.desc(), CreditEntitlement.id.desc()
+    ).limit(500).all()
+    credit_ledger = []
+    if lic.credit_account:
+        credit_ledger = db.query(CreditLedger).filter(
+            CreditLedger.account_id == lic.credit_account.id
+        ).order_by(CreditLedger.created_at.desc(), CreditLedger.id.desc()).limit(200).all()
+
     return templates.TemplateResponse(
         "license_edit.html",
-        {"request": request, "admin": admin, "license": lic, "credit_account": lic.credit_account, "default_credit_price": settings.AUDITOR_CREDIT_PRICE_CENTS},
+        {
+            "request": request,
+            "admin": admin,
+            "license": lic,
+            "credit_account": lic.credit_account,
+            "default_credit_price": settings.AUDITOR_CREDIT_PRICE_CENTS,
+            "credit_company": credit_company,
+            "credit_competence": credit_competence,
+            "total_entitlements": total_entitlements,
+            "filtered_entitlements": filtered_entitlements,
+            "entitlements": entitlements,
+            "credit_ledger": credit_ledger,
+        },
     )
 
 

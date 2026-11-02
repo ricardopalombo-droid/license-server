@@ -303,6 +303,81 @@ th {
     margin: 0;
 }
 
+.credit-audit-panel {
+    margin-top: 22px;
+}
+
+.credit-audit-head {
+    align-items: flex-start;
+}
+
+.credit-audit-head h2 {
+    margin-bottom: 4px;
+}
+
+.credit-total {
+    display: inline-flex;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #174ea6;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.credit-filter-form {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(170px, 220px) auto auto;
+    gap: 12px;
+    align-items: end;
+    margin: 18px 0 10px;
+}
+
+.credit-filter-form label {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    font-weight: 700;
+}
+
+.credit-filter-form input {
+    margin: 0;
+}
+
+.credit-filter-form .button-link {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.table-scroll {
+    overflow-x: auto;
+}
+
+.credit-audit-table {
+    min-width: 760px;
+}
+
+.credit-delta {
+    font-weight: 900;
+}
+
+.credit-delta.positive {
+    color: #15803d;
+}
+
+.credit-delta.negative {
+    color: #b91c1c;
+}
+
+@media (max-width: 820px) {
+    .credit-filter-form {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (min-width: 980px) {
     .dashboard-stack {
         grid-template-columns: 1fr;

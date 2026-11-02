@@ -68,4 +68,91 @@
         <button type="submit">Salvar alterações</button>
     </form>
 </section>
+
+<section class="panel credit-audit-panel">
+    <div class="header-row credit-audit-head">
+        <div>
+            <h2>Empresas e competências já liberadas</h2>
+            <p class="muted-note">Este é o registro definitivo do consumo. Uma linha é criada somente quando a auditoria termina com sucesso.</p>
+        </div>
+        <span class="credit-total">{{ total_entitlements }} liberação(ões)</span>
+    </div>
+
+    <form method="get" action="/admin/licenses/{{ license.id }}/edit" class="credit-filter-form">
+        <label>
+            Empresa
+            <input type="search" name="credit_company" value="{{ credit_company }}" placeholder="Código ou nome da empresa">
+        </label>
+        <label>
+            Competência
+            <input type="month" name="credit_competence" value="{{ credit_competence }}">
+        </label>
+        <button type="submit">Filtrar histórico</button>
+        <a class="button-link secondary" href="/admin/licenses/{{ license.id }}/edit">Limpar</a>
+    </form>
+
+    <p class="muted-note">Exibindo {{ entitlements|length }} de {{ filtered_entitlements }} registro(s) encontrado(s). O painel mostra até 500 linhas por consulta.</p>
+    {% if entitlements %}
+    <div class="table-scroll">
+        <table class="credit-audit-table">
+            <thead>
+                <tr>
+                    <th>Empresa</th>
+                    <th>Competência</th>
+                    <th>Liberada em</th>
+                    <th>Situação</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in entitlements %}
+                <tr>
+                    <td><strong>{{ item.company_alias or "Sem código" }}</strong><br><span class="muted-inline">{{ item.company_name or "Nome não informado" }}</span></td>
+                    <td><strong>{{ item.competence[5:7] }}/{{ item.competence[0:4] }}</strong></td>
+                    <td>{{ item.unlocked_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td><span class="usage-status usage-active">Consumido e liberado</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">Nenhuma empresa/competência encontrada com os filtros informados.</div>
+    {% endif %}
+</section>
+
+<section class="panel credit-audit-panel">
+    <div class="header-row credit-audit-head">
+        <div>
+            <h2>Movimentações do saldo</h2>
+            <p class="muted-note">Compras, ajustes manuais, reservas, devoluções e saldo resultante.</p>
+        </div>
+    </div>
+    {% if credit_ledger %}
+    <div class="table-scroll">
+        <table class="credit-audit-table">
+            <thead><tr><th>Data</th><th>Movimento</th><th>Quantidade</th><th>Saldo posterior</th><th>Referência</th></tr></thead>
+            <tbody>
+                {% for item in credit_ledger %}
+                <tr>
+                    <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td>
+                        {% if item.event_type == 'purchase' %}Compra aprovada
+                        {% elif item.event_type == 'admin_adjustment' %}Ajuste administrativo
+                        {% elif item.event_type == 'reservation' %}Reserva para auditoria
+                        {% elif item.event_type == 'reservation_cancelled' %}Devolução por cancelamento
+                        {% elif item.event_type == 'reservation_expired' %}Devolução por expiração
+                        {% else %}{{ item.event_type }}{% endif %}
+                    </td>
+                    <td class="credit-delta {{ 'positive' if item.delta > 0 else 'negative' }}">{{ '+' if item.delta > 0 else '' }}{{ item.delta }}</td>
+                    <td>{{ item.balance_after }}</td>
+                    <td><span class="muted-inline">{{ item.notes or item.reference or '—' }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">Ainda não existem movimentações de créditos para esta licença.</div>
+    {% endif %}
+</section>
 {% endblock %}

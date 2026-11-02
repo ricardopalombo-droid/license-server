@@ -22,9 +22,18 @@ from app.models import (
     LicenseSession,
     Product,
 )
-from app.routers.client_credits import commit, create_quote, reserve
-from app.routers.webhook_mp import confirm_credit_purchase, preview_credit_purchase
-from app.schemas import CreditQuoteOperation, CreditQuoteRequest, CreditReservationOperation
+from app.routers.client_credits import commit, create_quote, create_store_access, reserve
+from app.routers.webhook_mp import (
+    confirm_credit_purchase,
+    credit_customer_context,
+    preview_credit_purchase,
+)
+from app.schemas import (
+    CreditQuoteOperation,
+    CreditQuoteRequest,
+    CreditReservationOperation,
+    CreditSessionRequest,
+)
 
 
 class CreditFlowTest(unittest.TestCase):
@@ -32,7 +41,7 @@ class CreditFlowTest(unittest.TestCase):
     def setUpClass(cls):
         Base.metadata.create_all(bind=engine)
         db = SessionLocal()
-        customer = Customer(name="Teste", company="Empresa Teste")
+        customer = Customer(name="Teste", company="Empresa Teste", email="teste@example.com")
         product = Product(name="Auditor Integrado", code="22", is_active=True)
         db.add_all([customer, product])
         db.flush()
@@ -103,6 +112,30 @@ class CreditFlowTest(unittest.TestCase):
             self.assertEqual(reprocessing["required_credits"], 0)
             self.assertEqual(reprocessing["unlocked_items"], 1)
             self.assertEqual(reprocessing["credit_balance"], 4)
+        finally:
+            db.close()
+
+    def test_app_store_access_identifies_license_without_typing_key(self):
+        db = SessionLocal()
+        try:
+            access = create_store_access(CreditSessionRequest(session_token="session"), db)
+            context = credit_customer_context(
+                {"access_token": access["access_token"]}, db, "Bearer test-token"
+            )
+            self.assertEqual(context["customer_email"], "teste@example.com")
+            self.assertIn("TESTE"[-6:], context["license_hint"])
+
+            preview = preview_credit_purchase(
+                {
+                    "access_token": access["access_token"],
+                    "product_code": "22",
+                    "quantity": 2,
+                },
+                db,
+                "Bearer test-token",
+            )
+            self.assertEqual(preview["customer_email"], "teste@example.com")
+            self.assertEqual(preview["quantity"], 2)
         finally:
             db.close()
 

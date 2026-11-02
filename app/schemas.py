@@ -51,6 +51,10 @@ class CreditItem(BaseModel):
     competence: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
+class CreditSessionRequest(BaseModel):
+    session_token: str
+
+
 class CreditQuoteRequest(BaseModel):
     session_token: str
     items: list[CreditItem] = Field(min_length=1, max_length=10000)

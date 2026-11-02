@@ -10,6 +10,7 @@ from app.dependencies import get_db
 from app.models import Customer, Product, License, LicenseCreditAccount, CreditLedger, CreditPurchase
 from app.utils import generate_license_key
 from app.config import settings
+from app.credit_access import verify_credit_access_token
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
 
@@ -134,6 +135,45 @@ def renovar_mais_30_dias(data_base: datetime | None) -> datetime:
     return base + timedelta(days=30)
 
 
+def license_from_credit_access(db: Session, access_token: str, product_code: str = "22") -> License:
+    try:
+        license_id = verify_credit_access_token(access_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    license_obj = db.query(License).join(Product).filter(
+        License.id == license_id,
+        Product.code == product_code,
+        License.status == "active",
+    ).first()
+    if not license_obj:
+        raise HTTPException(status_code=404, detail="Licença do Auditor Integrado não encontrada")
+    return license_obj
+
+
+@router.post("/credits/customer-context")
+def credit_customer_context(
+    data: dict,
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
+):
+    validar_token_integracao(authorization)
+    access_token = str(data.get("access_token") or "").strip()
+    if not access_token:
+        raise HTTPException(status_code=422, detail="Acesso de compra não informado")
+    license_obj = license_from_credit_access(db, access_token)
+    account = license_obj.credit_account
+    if not license_obj.customer.email:
+        raise HTTPException(status_code=422, detail="O cadastro da licença não possui e-mail")
+    return {
+        "ok": True,
+        "customer_name": license_obj.customer.name,
+        "customer_email": license_obj.customer.email,
+        "license_hint": f"•••• {license_obj.license_key[-6:]}",
+        "credit_balance": account.balance if account else 0,
+        "unit_price_cents": account.unit_price_cents if account else settings.AUDITOR_CREDIT_PRICE_CENTS,
+    }
+
+
 @router.post("/credits/price")
 def credit_price(
     data: dict,
@@ -142,9 +182,14 @@ def credit_price(
 ):
     validar_token_integracao(authorization)
     license_key = str(data.get("license_key") or "").strip().upper()
+    access_token = str(data.get("access_token") or "").strip()
     product_code = str(data.get("product_code") or "22").strip().upper()
     unit_price = settings.AUDITOR_CREDIT_PRICE_CENTS
-    if license_key:
+    if access_token:
+        license_obj = license_from_credit_access(db, access_token, product_code)
+        if license_obj.credit_account:
+            unit_price = license_obj.credit_account.unit_price_cents
+    elif license_key:
         license_obj = db.query(License).join(Product).filter(
             License.license_key == license_key,
             Product.code == product_code,
@@ -166,18 +211,25 @@ def preview_credit_purchase(
     email = str(data.get("email") or "").strip().lower()
     name = str(data.get("name") or "").strip()
     license_key = str(data.get("license_key") or "").strip().upper()
+    access_token = str(data.get("access_token") or "").strip()
     product_code = str(data.get("product_code") or "22").strip().upper()
     try:
         quantity = int(data.get("quantity") or 0)
     except (TypeError, ValueError):
         quantity = 0
-    if not email or quantity < 1 or quantity > 10000:
-        raise HTTPException(status_code=422, detail="E-mail ou quantidade de créditos inválida")
+    if quantity < 1 or quantity > 10000:
+        raise HTTPException(status_code=422, detail="Quantidade de créditos inválida")
     product = db.query(Product).filter(Product.code == product_code, Product.is_active == True).first()
     if not product:
         raise HTTPException(status_code=404, detail="Produto de créditos não encontrado")
     license_obj = None
-    if license_key:
+    if access_token:
+        license_obj = license_from_credit_access(db, access_token, product_code)
+        email = str(license_obj.customer.email or "").strip().lower()
+        name = str(license_obj.customer.name or "").strip()
+        if not email:
+            raise HTTPException(status_code=422, detail="O cadastro da licença não possui e-mail")
+    elif license_key:
         license_obj = db.query(License).filter(
             License.license_key == license_key,
             License.product_id == product.id,
@@ -185,6 +237,8 @@ def preview_credit_purchase(
         if not license_obj:
             raise HTTPException(status_code=404, detail="A licença informada não pertence ao Auditor Integrado")
     else:
+        if not email:
+            raise HTTPException(status_code=422, detail="E-mail não informado")
         customer = db.query(Customer).filter(Customer.email == email).first()
         if customer:
             license_obj = db.query(License).filter(
@@ -216,6 +270,8 @@ def preview_credit_purchase(
         "unit_price_cents": purchase.unit_price_cents,
         "amount_cents": purchase.amount_cents,
         "product_name": product.name,
+        "customer_name": name,
+        "customer_email": email,
     }
 
 

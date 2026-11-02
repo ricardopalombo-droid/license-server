@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.credit_access import create_credit_access_token
 from app.dependencies import get_db
 from app.models import (
     CreditEntitlement,
@@ -18,7 +19,12 @@ from app.models import (
     LicenseCreditAccount,
     LicenseSession,
 )
-from app.schemas import CreditQuoteOperation, CreditQuoteRequest, CreditReservationOperation
+from app.schemas import (
+    CreditQuoteOperation,
+    CreditQuoteRequest,
+    CreditReservationOperation,
+    CreditSessionRequest,
+)
 
 
 router = APIRouter(prefix="/client/credits", tags=["client-credits"])
@@ -101,6 +107,18 @@ def quote_response(quote: CreditQuote, account: LicenseCreditAccount):
         "amount_cents": quote.required_credits * quote.unit_price_cents,
         "can_run": account.balance >= quote.required_credits,
         "expires_at": quote.expires_at.isoformat(),
+    }
+
+
+@router.post("/store-access")
+def create_store_access(data: CreditSessionRequest, db: Session = Depends(get_db)):
+    session = active_session(db, data.session_token)
+    account = credit_account(db, session.license_id)
+    return {
+        "ok": True,
+        "access_token": create_credit_access_token(session.license_id),
+        "credit_balance": account.balance,
+        "expires_in_minutes": 30,
     }
 
 
