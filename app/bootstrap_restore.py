@@ -56,6 +56,10 @@ SEED_DATA = {
         {"id": 16, "name": "Cadastro automatizado de funcionários", "code": "16", "is_active": 1},
         {"id": 17, "name": "Central de documentos", "code": "17", "is_active": 1},
         {"id": 18, "name": "Consolidador de Folhas", "code": "18", "is_active": 1},
+        {"id": 19, "name": "ECAC - Integra Contador", "code": "19", "is_active": 1},
+        {"id": 20, "name": "Buscador XML", "code": "20", "is_active": 1},
+        {"id": 21, "name": "Consolida impostos", "code": "21", "is_active": 1},
+        {"id": 22, "name": "Auditor Integrado", "code": "22", "is_active": 1},
     ],
     "licenses": [
         {
