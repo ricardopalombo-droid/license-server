@@ -9,6 +9,7 @@ from app.dependencies import get_db, get_current_admin
 from app.models import (
     AdminUser, Customer, Product, License, LicenseSession,
     LicenseCreditAccount, CreditEntitlement, CreditLedger, CreditPurchase, CreditQuote, CreditQuoteItem,
+    CaptchaUsage,
 )
 from app.utils import generate_license_key, plan_expiration
 from app.config import settings
@@ -128,6 +129,60 @@ def usage_partial(request: Request, db: Session = Depends(get_db)):
     context.update({"request": request, "admin": admin})
 
     return templates.TemplateResponse("usage_panel_content.html", context)
+
+
+@router.get("/captchas", response_class=HTMLResponse)
+def captcha_usage_page(request: Request, db: Session = Depends(get_db)):
+    admin = safe_admin(request, db)
+    if not admin:
+        return redirect_login()
+
+    since = datetime.utcnow() - timedelta(days=30)
+    recent = (
+        db.query(CaptchaUsage)
+        .filter(CaptchaUsage.created_at >= since)
+        .order_by(CaptchaUsage.created_at.desc())
+        .limit(500)
+        .all()
+    )
+    total = len(recent)
+    solved = sum(1 for item in recent if item.status == "solved")
+    failed = sum(1 for item in recent if item.status in ("failed", "timeout"))
+    processing = sum(1 for item in recent if item.status == "processing")
+
+    customer_stats = {}
+    for item in recent:
+        customer = item.license.customer
+        customer_name = customer.company or customer.name
+        key = (customer_name, item.provider)
+        row = customer_stats.setdefault(
+            key,
+            {"customer": customer_name, "provider": item.provider, "total": 0, "solved": 0, "failed": 0},
+        )
+        row["total"] += 1
+        if item.status == "solved":
+            row["solved"] += 1
+        elif item.status in ("failed", "timeout"):
+            row["failed"] += 1
+
+    return templates.TemplateResponse(
+        "captcha_usage.html",
+        {
+            "request": request,
+            "admin": admin,
+            "recent": recent,
+            "customer_stats": sorted(customer_stats.values(), key=lambda value: (-value["total"], value["customer"])),
+            "total": total,
+            "solved": solved,
+            "failed": failed,
+            "processing": processing,
+            "capmonster_configured": bool(settings.CAPMONSTER_API_KEY),
+            "nonecap_configured": bool(settings.NONECAP_API_KEY),
+            "rate_limit": settings.CAPTCHA_RATE_LIMIT_PER_HOUR,
+            "concurrent_per_license": settings.CAPTCHA_MAX_CONCURRENT_PER_LICENSE,
+            "concurrent_global": settings.CAPTCHA_MAX_CONCURRENT_GLOBAL,
+        },
+    )
 
 
 @router.get("/customers", response_class=HTMLResponse)

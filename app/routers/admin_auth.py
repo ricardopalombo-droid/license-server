@@ -42,7 +42,9 @@ def login_submit(
         key=settings.ADMIN_COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
+        secure=settings.ADMIN_COOKIE_SECURE,
+        samesite=settings.ADMIN_COOKIE_SAMESITE,
+        path="/",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
     return response
@@ -51,5 +53,10 @@ def login_submit(
 @router.get("/logout")
 def logout():
     response = RedirectResponse(url="/login", status_code=302)
-    response.delete_cookie(settings.ADMIN_COOKIE_NAME)
+    response.delete_cookie(
+        settings.ADMIN_COOKIE_NAME,
+        path="/",
+        secure=settings.ADMIN_COOKIE_SECURE,
+        samesite=settings.ADMIN_COOKIE_SAMESITE,
+    )
     return response

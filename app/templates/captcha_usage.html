@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="header-row">
+    <div>
+        <h2>Consumo de captchas</h2>
+        <p class="muted-note">Últimas 500 solicitações dos últimos 30 dias.</p>
+    </div>
+</div>
+
+<div class="cards usage-cards">
+    <div class="card"><strong>Total</strong><span>{{ total }}</span></div>
+    <div class="card"><strong>Resolvidos</strong><span>{{ solved }}</span></div>
+    <div class="card"><strong>Falhas</strong><span>{{ failed }}</span></div>
+    <div class="card"><strong>Em processamento</strong><span>{{ processing }}</span></div>
+</div>
+
+<div class="panel captcha-settings">
+    <h3>Configuração protegida do Railway</h3>
+    <div class="captcha-config-grid">
+        <div><strong>CapMonster:</strong> {{ "configurado" if capmonster_configured else "não configurado" }}</div>
+        <div><strong>NoneCap:</strong> {{ "configurado" if nonecap_configured else "não configurado" }}</div>
+        <div><strong>Limite por licença:</strong> {{ rate_limit }}/hora</div>
+        <div><strong>Simultâneos por licença:</strong> {{ concurrent_per_license }}</div>
+        <div><strong>Simultâneos globais:</strong> {{ concurrent_global }}</div>
+    </div>
+    <p class="muted-note">As chaves nunca são exibidas ou enviadas ao navegador.</p>
+</div>
+
+<h3>Resumo por cliente e provedor</h3>
+<table>
+    <thead>
+        <tr><th>Cliente</th><th>Provedor</th><th>Total</th><th>Resolvidos</th><th>Falhas</th></tr>
+    </thead>
+    <tbody>
+    {% for row in customer_stats %}
+        <tr>
+            <td>{{ row.customer }}</td>
+            <td>{{ row.provider }}</td>
+            <td>{{ row.total }}</td>
+            <td>{{ row.solved }}</td>
+            <td>{{ row.failed }}</td>
+        </tr>
+    {% else %}
+        <tr><td colspan="5">Nenhum consumo registrado.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<h3>Solicitações recentes</h3>
+<div class="captcha-table-wrap">
+<table>
+    <thead>
+        <tr>
+            <th>Data</th><th>Cliente</th><th>Licença</th><th>Provedor</th><th>Tipo</th>
+            <th>Status</th><th>Duração</th><th>Custo</th><th>Detalhe</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for item in recent %}
+        <tr>
+            <td>{{ item.created_at.strftime("%d/%m/%Y %H:%M:%S") }}</td>
+            <td>{{ item.license.customer.company or item.license.customer.name }}</td>
+            <td>…{{ item.license.license_key[-6:] }}</td>
+            <td>{{ item.provider }}</td>
+            <td>{{ item.captcha_type }}</td>
+            <td><span class="usage-badge {{ 'usage-active' if item.status == 'solved' else 'usage-empty' }}">{{ item.status }}</span></td>
+            <td>{{ item.duration_ms ~ ' ms' if item.duration_ms is not none else '-' }}</td>
+            <td>{{ item.provider_cost or '-' }}</td>
+            <td>{{ item.error_message or '-' }}</td>
+        </tr>
+    {% else %}
+        <tr><td colspan="9">Nenhuma solicitação registrada.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

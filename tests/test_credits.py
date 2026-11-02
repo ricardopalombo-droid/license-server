@@ -1,7 +1,12 @@
 import os
 import tempfile
 import unittest
+from base64 import b64encode
 from datetime import datetime, timedelta
+from unittest.mock import patch
+
+from fastapi import HTTPException
+from starlette.requests import Request
 
 
 handle, database_path = tempfile.mkstemp(prefix="palsys-credit-test-", suffix=".db")
@@ -17,6 +22,7 @@ os.environ.setdefault("SMTP_FROM", "test@example.com")
 from app.database import Base, SessionLocal, engine
 from app.models import (
     Customer,
+    CaptchaUsage,
     License,
     LicenseCreditAccount,
     LicenseSession,
@@ -29,11 +35,14 @@ from app.routers.webhook_mp import (
     preview_credit_purchase,
 )
 from app.schemas import (
+    CaptchaHcaptchaRequest,
+    CaptchaImageRequest,
     CreditQuoteOperation,
     CreditQuoteRequest,
     CreditReservationOperation,
     CreditSessionRequest,
 )
+from app.routers.client_captcha import solve_nfe_hcaptcha, solve_sp_image
 
 
 class CreditFlowTest(unittest.TestCase):
@@ -43,7 +52,8 @@ class CreditFlowTest(unittest.TestCase):
         db = SessionLocal()
         customer = Customer(name="Teste", company="Empresa Teste", email="teste@example.com")
         product = Product(name="Auditor Integrado", code="22", is_active=True)
-        db.add_all([customer, product])
+        captcha_product = Product(name="Buscador XML", code="20", is_active=True)
+        db.add_all([customer, product, captcha_product])
         db.flush()
         license_obj = License(
             customer_id=customer.id,
@@ -57,6 +67,18 @@ class CreditFlowTest(unittest.TestCase):
         )
         db.add(license_obj)
         db.flush()
+        captcha_license = License(
+            customer_id=customer.id,
+            product_id=captcha_product.id,
+            license_key="CAPTCHA-TESTE",
+            plan_type="monthly",
+            status="active",
+            max_concurrent_sessions=1,
+            grace_days=4,
+            expires_at=datetime.utcnow() + timedelta(days=30),
+        )
+        db.add(captcha_license)
+        db.flush()
         db.add_all([
             LicenseSession(
                 license_id=license_obj.id,
@@ -69,6 +91,12 @@ class CreditFlowTest(unittest.TestCase):
                 enabled=True,
                 balance=5,
                 unit_price_cents=500,
+            ),
+            LicenseSession(
+                license_id=captcha_license.id,
+                machine_id="captcha-machine",
+                session_token="captcha-session-token",
+                status="active",
             ),
         ])
         db.commit()
@@ -209,6 +237,78 @@ class CreditFlowTest(unittest.TestCase):
             ).first()
             self.assertEqual(license_obj.plan_type, "credits")
             self.assertEqual(license_obj.expires_at.year, 2099)
+        finally:
+            db.close()
+
+    @staticmethod
+    def _request():
+        return Request({"type": "http", "method": "POST", "path": "/", "headers": [], "client": ("127.0.0.1", 1234)})
+
+    def test_captcha_proxy_uses_license_session_and_records_sp_consumption(self):
+        # PNG 1x1 válido; o provedor é simulado para o teste não consumir saldo.
+        png = b64encode(
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+            b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDAT\x08\xd7c\xf8\xcf\xc0\xf0\x1f\x00\x05\x00\x01\xff\x89\x99=\x1d\x00\x00\x00\x00IEND\xaeB`\x82"
+        ).decode("ascii")
+        db = SessionLocal()
+        try:
+            with patch(
+                "app.routers.client_captcha.solve_capmonster_image",
+                return_value={"text": "ABC123", "task_id": "task-sp", "cost": "0.001"},
+            ):
+                result = solve_sp_image(
+                    CaptchaImageRequest(
+                        session_token="captcha-session-token",
+                        context="sefaz_sp_nfe",
+                        image_base64=png,
+                    ),
+                    self._request(),
+                    db,
+                )
+            self.assertEqual(result["text"], "ABC123")
+            usage = db.query(CaptchaUsage).filter(CaptchaUsage.provider_task_id == "task-sp").one()
+            self.assertEqual(usage.status, "solved")
+            self.assertEqual(usage.provider, "capmonster")
+        finally:
+            db.close()
+
+    def test_captcha_proxy_allows_only_nfe_portal_for_nonecap(self):
+        db = SessionLocal()
+        try:
+            with self.assertRaises(HTTPException) as blocked:
+                solve_nfe_hcaptcha(
+                    CaptchaHcaptchaRequest(
+                        session_token="captcha-session-token",
+                        page_url="https://example.com/portal/consultaRecaptcha.aspx",
+                        sitekey="sitekey_teste_123",
+                        user_agent="Mozilla/5.0 teste",
+                    ),
+                    self._request(),
+                    db,
+                )
+            self.assertEqual(blocked.exception.status_code, 400)
+
+            with patch(
+                "app.routers.client_captcha.solve_nonecap_hcaptcha",
+                return_value={"token": "token-resolvido", "response_key": "resp", "task_id": "task-nc", "cost": "1"},
+            ):
+                result = solve_nfe_hcaptcha(
+                    CaptchaHcaptchaRequest(
+                        session_token="captcha-session-token",
+                        page_url=(
+                            "https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx"
+                            "?tipoConsulta=resumo&tipoConteudo=teste"
+                        ),
+                        sitekey="sitekey_teste_123",
+                        user_agent="Mozilla/5.0 teste",
+                    ),
+                    self._request(),
+                    db,
+                )
+            self.assertEqual(result["token"], "token-resolvido")
+            usage = db.query(CaptchaUsage).filter(CaptchaUsage.provider_task_id == "task-nc").one()
+            self.assertEqual(usage.status, "solved")
+            self.assertEqual(usage.provider, "nonecap")
         finally:
             db.close()
 

@@ -92,6 +92,31 @@ class LicenseSession(Base):
     license = relationship("License", back_populates="sessions")
 
 
+class CaptchaUsage(Base):
+    __tablename__ = "captcha_usage"
+
+    id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(String(80), unique=True, nullable=False, index=True)
+    license_id = Column(Integer, ForeignKey("licenses.id"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("license_sessions.id"), nullable=False, index=True)
+    provider = Column(String(30), nullable=False, index=True)
+    captcha_type = Column(String(40), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="processing", index=True)
+    page_host = Column(String(180), nullable=True)
+    sitekey_hash = Column(String(64), nullable=True)
+    provider_task_id = Column(String(120), nullable=True)
+    provider_cost = Column(String(50), nullable=True)
+    client_ip = Column(String(80), nullable=True)
+    error_code = Column(String(80), nullable=True)
+    error_message = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    completed_at = Column(DateTime, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+
+    license = relationship("License")
+    session = relationship("LicenseSession")
+
+
 class LicenseCreditAccount(Base):
     __tablename__ = "license_credit_accounts"
 

@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.database import engine, Base
 from app.bootstrap_restore import restore_initial_data_if_empty
-from app.routers import admin_auth, admin_web, client_credits, client_license, webhook_mp
+from app.routers import admin_auth, admin_web, client_captcha, client_credits, client_license, webhook_mp
 from app.config import settings
 
 Base.metadata.create_all(bind=engine)
@@ -16,6 +16,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(admin_auth.router)
 app.include_router(admin_web.router)
 app.include_router(client_license.router)
+app.include_router(client_captcha.router)
 app.include_router(client_credits.router)
 app.include_router(webhook_mp.router)
 

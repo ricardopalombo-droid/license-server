@@ -44,6 +44,20 @@ class ReleaseRequest(BaseModel):
     session_token: str
 
 
+class CaptchaImageRequest(BaseModel):
+    session_token: str = Field(min_length=16, max_length=255)
+    context: str = Field(pattern=r"^sefaz_sp_nfe$")
+    image_base64: str = Field(min_length=32, max_length=2_000_000)
+
+
+class CaptchaHcaptchaRequest(BaseModel):
+    session_token: str = Field(min_length=16, max_length=255)
+    page_url: str = Field(min_length=20, max_length=500)
+    sitekey: str = Field(min_length=10, max_length=200)
+    user_agent: str = Field(min_length=10, max_length=512)
+    rqdata: str | None = Field(default=None, max_length=4096)
+
+
 class CreditItem(BaseModel):
     company_key: str = Field(min_length=8, max_length=30)
     company_alias: str | None = Field(default=None, max_length=80)

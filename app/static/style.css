@@ -261,6 +261,20 @@ th {
     word-break: break-word;
 }
 
+.captcha-settings {
+    margin: 20px 0;
+}
+
+.captcha-config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.captcha-table-wrap {
+    overflow-x: auto;
+}
+
 .license-key-short {
     display: inline-block;
     max-width: 180px;
