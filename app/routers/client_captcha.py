@@ -25,6 +25,7 @@ CAPMONSTER_API_BASE = "https://api.capmonster.cloud"
 NONECAP_API_BASE = "https://api.nonecap.com/v1"
 ALLOWED_NFE_HOSTS = {"www.nfe.fazenda.gov.br", "nfe.fazenda.gov.br"}
 ALLOWED_NFE_PATH = "/portal/consultarecaptcha.aspx"
+ALLOWED_FGTS_HOSTS = {"fgtsdigital.sistema.gov.br"}
 PROCESSING_STALE_MINUTES = 5
 _limit_lock = threading.Lock()
 
@@ -51,7 +52,12 @@ def _response_json(response: requests.Response, description: str) -> dict:
     return payload
 
 
-def _active_captcha_session(db: Session, token: str) -> LicenseSession:
+def _active_captcha_session(
+    db: Session,
+    token: str,
+    product_code: str,
+    product_name: str,
+) -> LicenseSession:
     session = (
         db.query(LicenseSession)
         .join(License)
@@ -60,12 +66,12 @@ def _active_captcha_session(db: Session, token: str) -> LicenseSession:
             LicenseSession.session_token == token,
             LicenseSession.status == "active",
             License.status == "active",
-            Product.code == settings.CAPTCHA_PRODUCT_CODE,
+            Product.code == product_code,
         )
         .first()
     )
     if not session:
-        raise HTTPException(status_code=401, detail="Sessão de licença inválida para o Buscador XML.")
+        raise HTTPException(status_code=401, detail=f"Sessão de licença inválida para {product_name}.")
 
     now = datetime.utcnow()
     license_obj = session.license
@@ -213,6 +219,17 @@ def _validate_nfe_page(page_url: str, sitekey: str) -> str:
     return host
 
 
+def _validate_fgts_page(page_url: str, sitekey: str) -> str:
+    parsed = urlparse(page_url)
+    host = (parsed.hostname or "").lower()
+    allowed_host = host in ALLOWED_FGTS_HOSTS or host == "acesso.gov.br" or host.endswith(".acesso.gov.br")
+    if parsed.scheme.lower() != "https" or not allowed_host:
+        raise HTTPException(status_code=400, detail="Somente páginas de acesso do FGTS Digital e Gov.br são permitidas.")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{10,200}", sitekey):
+        raise HTTPException(status_code=400, detail="Identificador do hCaptcha inválido.")
+    return host
+
+
 def solve_capmonster_image(image_base64: str) -> dict:
     if not settings.CAPMONSTER_API_KEY:
         raise RuntimeError("CapMonster não está configurado no servidor.")
@@ -308,7 +325,12 @@ def solve_sp_image(
     db: Session = Depends(get_db),
 ):
     _validate_sefaz_image(data.image_base64)
-    session = _active_captcha_session(db, data.session_token)
+    session = _active_captcha_session(
+        db,
+        data.session_token,
+        settings.CAPTCHA_PRODUCT_CODE,
+        "o Buscador XML",
+    )
     usage = _reserve_usage(db, session, "capmonster", "sefaz_sp_image", request, page_host="nfe.fazenda.sp.gov.br")
     started = time.monotonic()
     try:
@@ -335,12 +357,67 @@ def solve_nfe_hcaptcha(
     db: Session = Depends(get_db),
 ):
     host = _validate_nfe_page(data.page_url, data.sitekey)
-    session = _active_captcha_session(db, data.session_token)
+    session = _active_captcha_session(
+        db,
+        data.session_token,
+        settings.CAPTCHA_PRODUCT_CODE,
+        "o Buscador XML",
+    )
     usage = _reserve_usage(
         db,
         session,
         "nonecap",
         "portal_nacional_hcaptcha",
+        request,
+        page_host=host,
+        sitekey=data.sitekey,
+    )
+    started = time.monotonic()
+    try:
+        solved = solve_nonecap_hcaptcha(
+            data.page_url,
+            data.sitekey,
+            data.user_agent,
+            data.rqdata,
+        )
+        _complete_usage(
+            db,
+            usage,
+            status="solved",
+            started=started,
+            task_id=solved.get("task_id"),
+            provider_cost=solved.get("cost"),
+        )
+        return {
+            "ok": True,
+            "request_id": usage.request_id,
+            "token": solved["token"],
+            "response_key": solved.get("response_key"),
+        }
+    except Exception as exc:
+        code = "timeout" if isinstance(exc, TimeoutError) else "provider_error"
+        _complete_usage(db, usage, status="failed", started=started, error_code=code, error_message=exc)
+        raise HTTPException(status_code=502, detail=_safe_error_message(exc)) from exc
+
+
+@router.post("/fgts-hcaptcha")
+def solve_fgts_hcaptcha(
+    data: CaptchaHcaptchaRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    host = _validate_fgts_page(data.page_url, data.sitekey)
+    session = _active_captcha_session(
+        db,
+        data.session_token,
+        settings.FGTS_CAPTCHA_PRODUCT_CODE,
+        "o FGTS Digital",
+    )
+    usage = _reserve_usage(
+        db,
+        session,
+        "nonecap",
+        "fgts_govbr_hcaptcha",
         request,
         page_host=host,
         sitekey=data.sitekey,

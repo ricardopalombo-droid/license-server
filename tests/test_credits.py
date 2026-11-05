@@ -42,7 +42,7 @@ from app.schemas import (
     CreditReservationOperation,
     CreditSessionRequest,
 )
-from app.routers.client_captcha import solve_nfe_hcaptcha, solve_sp_image
+from app.routers.client_captcha import solve_fgts_hcaptcha, solve_nfe_hcaptcha, solve_sp_image
 
 
 class CreditFlowTest(unittest.TestCase):
@@ -53,7 +53,8 @@ class CreditFlowTest(unittest.TestCase):
         customer = Customer(name="Teste", company="Empresa Teste", email="teste@example.com")
         product = Product(name="Auditor Integrado", code="22", is_active=True)
         captcha_product = Product(name="Buscador XML", code="20", is_active=True)
-        db.add_all([customer, product, captcha_product])
+        fgts_product = Product(name="Importação guia rápida - FGTS Digital", code="12", is_active=True)
+        db.add_all([customer, product, captcha_product, fgts_product])
         db.flush()
         license_obj = License(
             customer_id=customer.id,
@@ -79,6 +80,18 @@ class CreditFlowTest(unittest.TestCase):
         )
         db.add(captcha_license)
         db.flush()
+        fgts_license = License(
+            customer_id=customer.id,
+            product_id=fgts_product.id,
+            license_key="FGTS-TESTE",
+            plan_type="monthly",
+            status="active",
+            max_concurrent_sessions=1,
+            grace_days=4,
+            expires_at=datetime.utcnow() + timedelta(days=30),
+        )
+        db.add(fgts_license)
+        db.flush()
         db.add_all([
             LicenseSession(
                 license_id=license_obj.id,
@@ -96,6 +109,12 @@ class CreditFlowTest(unittest.TestCase):
                 license_id=captcha_license.id,
                 machine_id="captcha-machine",
                 session_token="captcha-session-token",
+                status="active",
+            ),
+            LicenseSession(
+                license_id=fgts_license.id,
+                machine_id="fgts-machine",
+                session_token="fgts-session-token",
                 status="active",
             ),
         ])
@@ -308,6 +327,51 @@ class CreditFlowTest(unittest.TestCase):
             self.assertEqual(result["token"], "token-resolvido")
             usage = db.query(CaptchaUsage).filter(CaptchaUsage.provider_task_id == "task-nc").one()
             self.assertEqual(usage.status, "solved")
+            self.assertEqual(usage.provider, "nonecap")
+        finally:
+            db.close()
+
+    def test_fgts_captcha_proxy_requires_fgts_license_and_allowed_page(self):
+        db = SessionLocal()
+        try:
+            request_data = dict(
+                page_url="https://sso.acesso.gov.br/login?client_id=fgtsdigital.sistema.gov.br",
+                sitekey="sitekey_teste_123",
+                user_agent="Mozilla/5.0 teste",
+            )
+            with self.assertRaises(HTTPException) as wrong_product:
+                solve_fgts_hcaptcha(
+                    CaptchaHcaptchaRequest(session_token="captcha-session-token", **request_data),
+                    self._request(),
+                    db,
+                )
+            self.assertEqual(wrong_product.exception.status_code, 401)
+
+            with self.assertRaises(HTTPException) as blocked:
+                solve_fgts_hcaptcha(
+                    CaptchaHcaptchaRequest(
+                        session_token="fgts-session-token",
+                        page_url="https://example.com/login",
+                        sitekey="sitekey_teste_123",
+                        user_agent="Mozilla/5.0 teste",
+                    ),
+                    self._request(),
+                    db,
+                )
+            self.assertEqual(blocked.exception.status_code, 400)
+
+            with patch(
+                "app.routers.client_captcha.solve_nonecap_hcaptcha",
+                return_value={"token": "token-fgts", "response_key": "resp", "task_id": "task-fgts", "cost": "1"},
+            ):
+                result = solve_fgts_hcaptcha(
+                    CaptchaHcaptchaRequest(session_token="fgts-session-token", **request_data),
+                    self._request(),
+                    db,
+                )
+            self.assertEqual(result["token"], "token-fgts")
+            usage = db.query(CaptchaUsage).filter(CaptchaUsage.provider_task_id == "task-fgts").one()
+            self.assertEqual(usage.captcha_type, "fgts_govbr_hcaptcha")
             self.assertEqual(usage.provider, "nonecap")
         finally:
             db.close()

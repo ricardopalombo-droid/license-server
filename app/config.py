@@ -16,10 +16,11 @@ class Settings(BaseSettings):
     OFFLINE_GRACE_DAYS: int = 4
     AUDITOR_CREDIT_PRICE_CENTS: int = 500
 
-    # Captchas do Buscador XML (produto 20). As chaves ficam somente no servidor.
+    # Captchas dos produtos PalSys. As chaves ficam somente no servidor.
     CAPMONSTER_API_KEY: str = ""
     NONECAP_API_KEY: str = ""
     CAPTCHA_PRODUCT_CODE: str = "20"
+    FGTS_CAPTCHA_PRODUCT_CODE: str = "12"
     CAPTCHA_RATE_LIMIT_PER_HOUR: int = 1000
     CAPTCHA_MAX_CONCURRENT_PER_LICENSE: int = 5
     CAPTCHA_MAX_CONCURRENT_GLOBAL: int = 25
